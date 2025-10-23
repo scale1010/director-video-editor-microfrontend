@@ -44,7 +44,7 @@ export const Images = () => {
   if (loading) {
     return (
       <div className="flex flex-1 flex-col">
-        <div className="text-text-primary flex h-12 flex-none items-center px-4 text-sm font-medium">
+        <div className="text-foreground flex h-12 flex-none items-center px-4 text-sm font-medium">
           Photos
           <span className="ml-2 text-xs text-zinc-400">(Loading...)</span>
         </div>
@@ -61,7 +61,7 @@ export const Images = () => {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="text-text-primary flex h-12 flex-none items-center px-4 text-sm font-medium">
+      <div className="text-foreground flex h-12 flex-none items-center px-4 text-sm font-medium">
         Photos
         {error && (
           <span className="ml-2 text-xs text-red-400">(API Error)</span>

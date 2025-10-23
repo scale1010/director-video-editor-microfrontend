@@ -245,16 +245,16 @@ export const RightDrawer = () => {
   };
 
   return (
-    <div className="fixed right-0 top-[58px] h-[calc(100vh-58px)] w-80 bg-zinc-900 border-l border-border/80 shadow-2xl transform transition-transform duration-300 ease-out z-[100] flex flex-col">
+    <div className="fixed right-0 top-[58px] h-[calc(100vh-58px)] w-80 bg-background border-l border-border/80 shadow-2xl transform transition-transform duration-300 ease-out z-[100] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/80 bg-zinc-900 flex-none">
-        <h3 className="font-medium text-sm">
+      <div className="flex items-center justify-between p-4 border-b border-border/80 bg-background flex-none">
+        <h3 className="font-medium text-sm text-foreground">
           {getDrawerTitle()}
         </h3>
       </div>
       
       {/* Content */}
-      <div className="flex-1 bg-zinc-900 pointer-events-auto overflow-y-auto" style={{ minHeight: 0 }}>
+      <div className="flex-1 bg-background pointer-events-auto overflow-y-auto" style={{ minHeight: 0 }}>
         {getDrawerContent()}
       </div>
     </div>
