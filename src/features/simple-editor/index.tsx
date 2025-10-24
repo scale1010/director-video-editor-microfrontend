@@ -218,3 +218,5 @@ export const SimpleEditor: React.FC = () => {
     </div>
   );
 };
+
+export default SimpleEditor;

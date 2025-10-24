@@ -2,7 +2,7 @@
 
 :root {
   /* Neutral palette */
-  --bg-canvas: #1e1e1e;                 /* board backdrop (dark theme) */
+  --bg-canvas: rgb(17 24 39 / var(--tw-bg-opacity));  /* board backdrop (dark theme) */
   --bg-panel: #2c2c2c;                  /* sidebars, toolbars */
   --bg-elev-1: #2f2f2f;                 /* cards, popovers */
   --bg-elev-2: #353535;
@@ -24,7 +24,7 @@
 
   --frame-fill: #1a1a1a;
   --frame-stroke: rgba(255,255,255,0.12);
-  --frame-shadow: 0 1px 1px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.45);
+  --frame-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1);
 
   --radius-xs: 4px;
   --radius-sm: 6px;

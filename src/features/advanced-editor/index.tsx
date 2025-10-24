@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Project, EditorState, EditorMode, InspectorTab, Frame } from '../shared/figma-editor/types';
+import { useNavigate } from 'react-router-dom';
+import { Project, EditorState, EditorMode, InspectorTab, Frame, Tool, BoardState } from '../shared/figma-editor/types';
 import { BoardView } from '../shared/figma-editor/components/BoardView';
-import { FrameEditorWrapper } from '../shared/figma-editor/components/FrameEditorWrapper';
 import { Inspector } from '../shared/figma-editor/components/Inspector';
 import { StatusBar } from '../shared/figma-editor/components/StatusBar';
 import { FloatingToolbar } from '../shared/figma-editor/components/FloatingToolbar';
@@ -14,6 +14,7 @@ import { getCompactFontData, loadFonts } from '../shared/editor/utils/fonts';
 import { FONTS } from '../shared/editor/data/fonts';
 import { SECONDARY_FONT, SECONDARY_FONT_URL } from '../shared/editor/constants/constants';
 import useDataState from '../shared/editor/store/use-data-state';
+// Simple Editor components are now used in separate frame editor page
 import '../shared/figma-editor/styles/tokens.css';
 import '../shared/figma-editor/styles/light-theme.css';
 
@@ -113,13 +114,13 @@ const createSampleProject = (): Project => ({
 
 export const AdvancedEditor: React.FC = () => {
   const { project, updateProject, updateFrame, addFrame, deleteFrame } = useProjectState(createSampleProject());
-  const { focusedFrameId, setFocusedFrameId, isFrameFocused } = useFocusController();
   const { setCompactFonts, setFonts } = useDataState();
 
   // Initialize editor state
   const [editorState, setEditorState] = useState<EditorState>({
     mode: 'board' as EditorMode,
     selectedFrames: [],
+    selectedFrameIds: [], // Add this for keyboard shortcuts compatibility
     activeInspectorTab: 'properties' as InspectorTab,
     isCreatingFrame: false,
     isPanning: false,
@@ -127,8 +128,34 @@ export const AdvancedEditor: React.FC = () => {
     contextMenu: null,
     showComments: false,
     comments: [],
-    focusCommentId: null
+    focusCommentId: null,
+    currentTool: 'move' as Tool,
+    boardState: {
+      zoom: 0.23,
+      scroll: { x: 0, y: 0 },
+      snap: true,
+      rulers: false,
+      guides: []
+    }
   });
+
+  // Initialize inspector state
+  const [inspectorState, setInspectorState] = useState<{
+    activeTab: InspectorTab;
+    selectedItem: { type: 'frame' | 'layer'; id: string } | null;
+  }>({
+    activeTab: 'properties',
+    selectedItem: null
+  });
+
+  // Initialize focus controller with proper parameters
+  const { enterFrameFocus, exitFrameFocus } = useFocusController({
+    editorState,
+    setEditorState,
+    setInspectorState
+  });
+
+  // Frame focus is now handled by navigation to separate frame editor page
 
   // Initialize fonts
   useEffect(() => {
@@ -146,27 +173,39 @@ export const AdvancedEditor: React.FC = () => {
   }, []);
 
   // Keyboard shortcuts
-  useKeyboardShortcuts();
+  useKeyboardShortcuts({
+    editorState,
+    setEditorState,
+    project,
+    updateProject,
+    enterFrameFocus,
+    exitFrameFocus,
+    updateFrame,
+    removeFrame: deleteFrame
+  });
 
   const handleFrameSelect = useCallback((frameId: string, multiSelect = false) => {
-    setEditorState(prev => ({
-      ...prev,
-      selectedFrames: multiSelect 
+    setEditorState(prev => {
+      const newSelectedFrames = multiSelect 
         ? prev.selectedFrames.includes(frameId)
           ? prev.selectedFrames.filter(id => id !== frameId)
           : [...prev.selectedFrames, frameId]
-        : [frameId]
-    }));
+        : [frameId];
+      
+      return {
+        ...prev,
+        selectedFrames: newSelectedFrames,
+        selectedFrameIds: newSelectedFrames // Keep both for compatibility
+      };
+    });
   }, []);
 
+  const navigate = useNavigate();
+  
   const handleFrameFocus = useCallback((frameId: string) => {
-    setFocusedFrameId(frameId);
-    setEditorState(prev => ({
-      ...prev,
-      mode: 'frame' as EditorMode,
-      selectedFrames: [frameId]
-    }));
-  }, [setFocusedFrameId]);
+    // Navigate to frame editor instead of inline frame view
+    navigate(`/frame-editor/${frameId}`);
+  }, [navigate]);
 
   const handleCreateFrame = useCallback((position: { x: number; y: number }, size: { w: number; h: number }) => {
     const newFrame: Frame = {
@@ -202,74 +241,134 @@ export const AdvancedEditor: React.FC = () => {
 
   const handleBackToBoard = useCallback(() => {
     setFocusedFrameId(null);
-    setEditorState(prev => ({
-      ...prev,
-      mode: 'board' as EditorMode,
-      selectedFrames: []
-    }));
-  }, [setFocusedFrameId]);
+    exitFrameFocus();
+  }, [exitFrameFocus]);
 
   return (
     <div className="h-screen w-screen bg-background text-foreground flex flex-col">
       {/* Top Status Bar */}
       <StatusBar 
         project={project}
-        focusedFrameId={focusedFrameId}
-        onBackToBoard={handleBackToBoard}
+        editorState={editorState}
       />
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        {isFrameFocused ? (
-          <FrameEditorWrapper
+        <div className="h-full relative">
+          {/* Board View */}
+          <BoardView
             project={project}
-            frameId={focusedFrameId!}
-            onUpdateFrame={handleFrameUpdate}
+            editorState={editorState}
+            onFrameSelect={handleFrameSelect}
+            onFrameFocus={handleFrameFocus}
+            onCreateFrame={handleCreateFrame}
+            onFrameUpdate={handleFrameUpdate}
+            onBoardStateChange={handleBoardStateChange}
+            showComments={editorState.showComments}
+            comments={editorState.comments}
+            focusCommentId={editorState.focusCommentId}
+            onAddCommentToFrame={(frameId, x, y) => {
+              // Handle adding comments to frames
+              console.log('Add comment to frame:', frameId, x, y);
+            }}
+            onDeleteComment={(commentId) => {
+              // Handle deleting comments
+              console.log('Delete comment:', commentId);
+            }}
+            onUpdateComment={(commentId, updates) => {
+              // Handle updating comments
+              console.log('Update comment:', commentId, updates);
+            }}
+          />
+
+          {/* Floating UI Elements */}
+          <FloatingActionBar
+            editorState={editorState}
+            onExport={() => {
+              console.log('Export project:', project);
+            }}
             onBackToBoard={handleBackToBoard}
           />
-        ) : (
-          <div className="h-full relative">
-            {/* Board View */}
-            <BoardView
-              project={project}
-              editorState={editorState}
-              onFrameSelect={handleFrameSelect}
-              onFrameFocus={handleFrameFocus}
-              onCreateFrame={handleCreateFrame}
-              onFrameUpdate={handleFrameUpdate}
-              onBoardStateChange={handleBoardStateChange}
-              showComments={editorState.showComments}
-              comments={editorState.comments}
-              focusCommentId={editorState.focusCommentId}
-            />
 
-            {/* Floating UI Elements */}
-            <FloatingActionBar
-              project={project}
-              onProjectUpdate={updateProject}
-              onUpdateAllFrames={(updates) => {
-                project.frames.forEach(frame => {
-                  updateFrame(frame.id, updates);
-                });
-              }}
-            />
+          <FloatingToolbar
+            currentTool={editorState.currentTool}
+            onToolChange={(tool) => {
+              setEditorState(prev => ({ ...prev, currentTool: tool }));
+            }}
+            boardState={editorState.boardState}
+            onBoardStateChange={(updates) => {
+              setEditorState(prev => ({
+                ...prev,
+                boardState: { ...prev.boardState, ...updates }
+              }));
+            }}
+            onAddFrame={handleCreateFrame}
+            onUpdateProject={updateProject}
+          />
 
-            <FloatingToolbar
-              project={project}
-              onAddFrame={handleCreateFrame}
-              onUpdateProject={updateProject}
-            />
+          <ZoomControls 
+            boardState={editorState.boardState}
+            onBoardStateChange={(updates) => {
+              setEditorState(prev => ({
+                ...prev,
+                boardState: { ...prev.boardState, ...updates }
+              }));
+            }}
+            onRecenter={() => {
+              setEditorState(prev => ({
+                ...prev,
+                boardState: { ...prev.boardState, scroll: { x: 0, y: 0 }, zoom: 1 }
+              }));
+            }}
+          />
 
-            <ZoomControls />
-
-            {/* Inspector */}
-            <Inspector
-              project={project}
-              onUpdateProject={updateProject}
-            />
-          </div>
-        )}
+          {/* Inspector */}
+          <Inspector
+            state={inspectorState}
+            onStateChange={setInspectorState}
+            project={project}
+            editorState={editorState}
+            onFrameUpdate={handleFrameUpdate}
+            onFrameSelect={handleFrameSelect}
+            onFrameReorder={(fromIndex, toIndex) => {
+              // Handle frame reordering
+              const newOrder = [...project.sequence.order];
+              const [movedFrame] = newOrder.splice(fromIndex, 1);
+              newOrder.splice(toIndex, 0, movedFrame);
+              updateProject(prev => ({
+                ...prev,
+                sequence: { ...prev.sequence, order: newOrder }
+              }));
+            }}
+            onFrameAdd={() => {
+              const newFrame: Frame = {
+                id: `frame-${Date.now()}`,
+                name: `Frame ${project.frames.length + 1}`,
+                position: { x: 100, y: 100 },
+                size: { w: 1080, h: 1920 },
+                background: project.workspace.backgroundColor,
+                fps: 30,
+                duration: 5.0,
+                posterTime: 0.25,
+                labelColor: 'blue',
+                layers: [],
+                timeline: {
+                  duration: 5.0,
+                  fps: 30,
+                  tracks: [],
+                  playheadTime: 0
+                }
+              };
+              addFrame(newFrame);
+            }}
+            onFrameDelete={deleteFrame}
+            onProjectUpdate={updateProject}
+            focusedFrame={null}
+          />
+        </div>
       </div>
     </div>
   );
 };
+
+export default AdvancedEditor;

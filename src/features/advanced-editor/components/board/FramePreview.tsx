@@ -215,7 +215,7 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
       >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 108, marginBottom: 27 }}>🎬</div>
-          <div style={{ fontSize: '54px', fontWeight: 500, color: '#666666' }}>Double-click to edit</div>
+          <div style={{ fontSize: '54px', fontWeight: 500, color: '#999999' }}>Double-click to edit</div>
         </div>
       </div>
 
