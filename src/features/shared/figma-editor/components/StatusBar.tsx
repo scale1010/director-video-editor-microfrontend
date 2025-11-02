@@ -26,9 +26,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({ project, editorState }) =>
     >
       {/* Left side - Frame info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
-        <span style={{ fontWeight: 500 }}>{project.frames.length} frames</span>
+        <span style={{ fontWeight: 500 }}>{project.frames?.length ?? 0} frames</span>
         <span>•</span>
-        <span>{project.sequence.order.length} in sequence</span>
+        <span>{project.sequence?.order?.length ?? 0} in sequence</span>
         <span>•</span>
         <span style={{ color: 'var(--text-primary)' }}>
           {editorState.mode === 'frame' ? 'Frame View' : 'Board View'}

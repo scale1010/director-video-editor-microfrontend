@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Frame } from '../types';
 
 interface FramePreviewProps {
@@ -23,6 +23,8 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 });
+  const [shouldPulse, setShouldPulse] = useState(false);
+  const prevSelectedRef = useRef(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   // Handle resize start
@@ -113,6 +115,20 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
+  // Trigger pulse animation when frame becomes selected (once per selection)
+  useEffect(() => {
+    if (isSelected && !prevSelectedRef.current) {
+      // Frame just became selected - trigger pulse animation
+      setShouldPulse(true);
+      // Remove pulse class after animation completes (0.8s)
+      const timer = setTimeout(() => {
+        setShouldPulse(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    prevSelectedRef.current = isSelected;
+  }, [isSelected]);
+
   // Get label color class
   const getLabelColor = (color: string) => {
     const colors: Record<string, string> = {
@@ -145,7 +161,7 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
   return (
     <div
       ref={frameRef}
-      className={`frame ${isSelected ? 'frame--selected' : ''}`}
+      className={`frame ${isSelected ? 'frame--selected' : ''} ${shouldPulse ? 'frame--pulse' : ''}`}
       style={{
         left: frame.position.x,
         top: frame.position.y,

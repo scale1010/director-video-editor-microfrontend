@@ -210,7 +210,7 @@ export const AdvancedEditor: React.FC = () => {
   const handleCreateFrame = useCallback((position: { x: number; y: number }, size: { w: number; h: number }) => {
     const newFrame: Frame = {
       id: `frame-${Date.now()}`,
-      name: `Frame ${project.frames.length + 1}`,
+      name: `Frame ${(project.frames?.length ?? 0) + 1}`,
       position,
       size,
       background: project.workspace.backgroundColor,
@@ -234,10 +234,17 @@ export const AdvancedEditor: React.FC = () => {
   }, [updateFrame]);
 
   const handleBoardStateChange = useCallback((updates: Partial<Project['board']>) => {
-    updateProject({
-      board: { ...project.board, ...updates }
-    });
-  }, [project.board, updateProject]);
+    // Update both project.board AND editorState.boardState
+    // The view uses editorState.boardState for rendering
+    setEditorState(prev => ({
+      ...prev,
+      boardState: { ...prev.boardState, ...updates }
+    }));
+    updateProject(prev => ({
+      ...prev,
+      board: { ...prev.board, ...updates }
+    }));
+  }, [updateProject]);
 
   const handleBackToBoard = useCallback(() => {
     setFocusedFrameId(null);
@@ -246,12 +253,6 @@ export const AdvancedEditor: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-background text-foreground flex flex-col">
-      {/* Top Status Bar */}
-      <StatusBar 
-        project={project}
-        editorState={editorState}
-      />
-
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full relative">
@@ -343,7 +344,7 @@ export const AdvancedEditor: React.FC = () => {
             onFrameAdd={() => {
               const newFrame: Frame = {
                 id: `frame-${Date.now()}`,
-                name: `Frame ${project.frames.length + 1}`,
+                name: `Frame ${(project.frames?.length ?? 0) + 1}`,
                 position: { x: 100, y: 100 },
                 size: { w: 1080, h: 1920 },
                 background: project.workspace.backgroundColor,
@@ -367,6 +368,12 @@ export const AdvancedEditor: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Status Bar at bottom */}
+      <StatusBar 
+        project={project}
+        editorState={editorState}
+      />
     </div>
   );
 };

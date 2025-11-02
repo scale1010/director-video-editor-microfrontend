@@ -46,6 +46,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  // Touch gesture state for pinch zoom
+  const touchStartRef = useRef<{ distance: number; center: { x: number; y: number } } | null>(null);
   // Simplified: no context menu; direct add on right-click
   const commentRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const MAX_COMMENT_CHARS = 280;
@@ -94,21 +96,157 @@ export const BoardView: React.FC<BoardViewProps> = ({
     };
   }, [isSpacePressed]);
 
-  // Handle mouse wheel zoom
+  // Handle mouse wheel zoom and trackpad pinch
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.1, Math.min(5, editorState.boardState.zoom * delta));
-      
-      onBoardStateChange({ zoom: newZoom });
+    // Only skip zoom if actively panning (not just space pressed, but actually dragging)
+    if (isPanning) {
+      return;
     }
-  }, [editorState.boardState.zoom, onBoardStateChange]);
+    
+    // Always handle wheel events for zoom - Mac trackpad sends wheel events for both scroll and pinch
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    // Prevent default to stop page scrolling
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if this is a trackpad pinch gesture (Mac trackpad sends ctrlKey/metaKey with pinch)
+    const isPinchGesture = e.ctrlKey || e.metaKey;
+    
+    // Get zoom center point (mouse position)
+    const zoomCenter = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+    
+    // Calculate zoom delta
+    // For Mac trackpad:
+    //   - Pinch gesture (ctrlKey/metaKey): deltaY is typically 50-200, large values
+    //   - Regular scroll: deltaY is typically 0.1-5, small fractional values
+    // For mouse wheel:
+    //   - deltaY is typically 100 per notch (pixel mode) or 3 per notch (line mode)
+    
+    let zoomDelta: number;
+    const absDelta = Math.abs(e.deltaY);
+    
+    if (isPinchGesture) {
+      // Mac trackpad pinch: large deltaY values (50-200)
+      zoomDelta = -e.deltaY * 0.005;
+    } else if (absDelta < 1) {
+      // Very small values: likely Mac trackpad regular scroll (0.1-0.9)
+      zoomDelta = -e.deltaY * 0.2;
+    } else if (absDelta < 50) {
+      // Medium values: could be trackpad scroll (1-49) or small mouse wheel
+      zoomDelta = -e.deltaY * 0.03;
+    } else {
+      // Large values: likely mouse wheel (100+) or large trackpad gesture
+      zoomDelta = -e.deltaY * 0.002;
+    }
+    
+    // Apply zoom change (positive deltaY = scroll down = zoom out)
+    const delta = 1 + zoomDelta;
+    const newZoom = Math.max(0.1, Math.min(5, editorState.boardState.zoom * delta));
+    
+    // Calculate the board position at the zoom center before zoom
+    const boardPos = screenToBoard(e.clientX, e.clientY);
+    
+    // Adjust scroll to keep the point under the mouse cursor in the same place
+    const newScroll = {
+      x: zoomCenter.x - boardPos.x * newZoom,
+      y: zoomCenter.y - boardPos.y * newZoom
+    };
+    
+    onBoardStateChange({ 
+      zoom: newZoom,
+      scroll: newScroll
+    });
+  }, [editorState.boardState.zoom, editorState.boardState.scroll, onBoardStateChange, screenToBoard, isPanning]);
+
+  // Handle touch gestures for pinch zoom
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const center = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+      touchStartRef.current = { distance, center };
+      e.preventDefault();
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2 && touchStartRef.current) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const center = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const zoomCenter = {
+        x: center.x - rect.left,
+        y: center.y - rect.top
+      };
+
+      // Calculate zoom based on distance change
+      const scale = distance / touchStartRef.current.distance;
+      const newZoom = Math.max(0.1, Math.min(5, editorState.boardState.zoom * scale));
+
+      // Calculate the board position at the zoom center
+      const boardPos = screenToBoard(center.x, center.y);
+
+      // Adjust scroll to keep the point under the fingers in the same place
+      const newScroll = {
+        x: zoomCenter.x - boardPos.x * newZoom,
+        y: zoomCenter.y - boardPos.y * newZoom
+      };
+
+      onBoardStateChange({
+        zoom: newZoom,
+        scroll: newScroll
+      });
+
+      // Update touch start for next move
+      touchStartRef.current = { distance, center };
+      e.preventDefault();
+    }
+  }, [editorState.boardState.zoom, editorState.boardState.scroll, onBoardStateChange, screenToBoard]);
+
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    if (e.touches.length < 2) {
+      touchStartRef.current = null;
+    }
+  }, []);
 
   // Handle mouse down / context menu (right click)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    console.log('🔵 MouseDown fired:', {
+      currentTool: editorState.currentTool,
+      button: e.button,
+      isSpacePressed,
+      clientX: e.clientX,
+      clientY: e.clientY
+    });
+
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {
+      console.log('❌ No rect found');
+      return;
+    }
 
     const boardPos = screenToBoard(e.clientX, e.clientY);
 
@@ -132,11 +270,20 @@ export const BoardView: React.FC<BoardViewProps> = ({
     }
 
     // Handle different tools
-    if (editorState.currentTool === 'hand' || e.button === 1 || (e.button === 0 && isSpacePressed)) {
+    const shouldPan = editorState.currentTool === 'hand' || e.button === 1 || (e.button === 0 && isSpacePressed);
+    console.log('🔍 Should pan?', shouldPan, {
+      'tool === hand': editorState.currentTool === 'hand',
+      'button === 1': e.button === 1,
+      'button === 0 && space': e.button === 0 && isSpacePressed
+    });
+
+    if (shouldPan) {
       // Pan mode
+      console.log('✅ Starting pan');
+      e.preventDefault();
+      e.stopPropagation();
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY });
-      e.preventDefault();
     } else if (editorState.currentTool === 'frame') {
       // Frame creation mode
       if (!clickedFrame) {
@@ -166,8 +313,21 @@ export const BoardView: React.FC<BoardViewProps> = ({
   // Handle mouse move
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isPanning) {
+      e.preventDefault();
+      e.stopPropagation();
+      
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
+      
+      console.log('🟢 Panning:', {
+        dx,
+        dy,
+        currentScroll: editorState.boardState.scroll,
+        newScroll: {
+          x: editorState.boardState.scroll.x + dx,
+          y: editorState.boardState.scroll.y + dy
+        }
+      });
       
       onBoardStateChange({
         scroll: {
@@ -243,6 +403,13 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
+    console.log('🟡 MouseUp fired:', { isPanning, isCreatingFrame });
+    
+    if (isPanning) {
+      console.log('🛑 Stopping pan');
+      setIsPanning(false);
+    }
+    
     if (isCreatingFrame && frameCreationStart && selectionBox) {
       // Create frame
       const size = {
@@ -278,12 +445,11 @@ export const BoardView: React.FC<BoardViewProps> = ({
       });
     }
 
-    setIsPanning(false);
     setIsCreatingFrame(false);
     setFrameCreationStart(null);
     setSelectionBox(null);
     setDraggedFrameId(null);
-  }, [isCreatingFrame, frameCreationStart, selectionBox, draggedFrameId, onCreateFrame, onFrameSelect, project.frames]);
+  }, [isPanning, isCreatingFrame, frameCreationStart, selectionBox, draggedFrameId, onCreateFrame, onFrameSelect, project.frames]);
 
   // Handle double click to focus frame
   const handleFrameDoubleClick = useCallback((frameId: string) => {
@@ -293,18 +459,30 @@ export const BoardView: React.FC<BoardViewProps> = ({
   // Set up event listeners
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.log('⚠️ Canvas ref not available');
+      return;
+    }
+
+    console.log('✅ Setting up event listeners');
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('touchstart', handleTouchStart as EventListener, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove as EventListener, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd as EventListener, { passive: false });
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      console.log('🧹 Cleaning up event listeners');
       canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('touchstart', handleTouchStart as EventListener);
+      canvas.removeEventListener('touchmove', handleTouchMove as EventListener);
+      canvas.removeEventListener('touchend', handleTouchEnd as EventListener);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleWheel, handleMouseMove, handleMouseUp]);
+  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseMove, handleMouseUp]);
 
   // Get cursor style
   const getCursorStyle = () => {
@@ -323,7 +501,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
       onMouseDown={handleMouseDown}
       style={{ 
         cursor: getCursorStyle(),
-        '--grid-color': project.workspace.gridColor
+        '--grid-color': project.workspace.gridColor,
+        touchAction: 'none'
       } as React.CSSProperties}
     >
       {/* Rulers */}
