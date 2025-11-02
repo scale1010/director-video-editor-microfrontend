@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Frame } from '../types';
+import { FRAME_PLACEHOLDERS, FramePlaceholderType } from '../../../../assets/illustrations/framePlaceholders';
 
 interface FramePreviewProps {
   frame: Frame;
@@ -158,6 +159,63 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
     return cursors[handle];
   };
 
+  // Get placeholder illustration type and GIF path based on frame name
+  const getPlaceholderIllustration = (frameName: string): { type: FramePlaceholderType; gif: string; text: string } => {
+    const nameLower = frameName.toLowerCase();
+    
+    // Intro frame
+    if (nameLower.includes('intro') || nameLower === 'intro') {
+      return {
+        type: 'intro',
+        gif: FRAME_PLACEHOLDERS.intro,
+        text: 'Start your story'
+      };
+    }
+    
+    // Outro frame
+    if (nameLower.includes('outro') || nameLower === 'outro') {
+      return {
+        type: 'outro',
+        gif: FRAME_PLACEHOLDERS.outro,
+        text: 'Finish strong'
+      };
+    }
+    
+    // Main Content / Middle frame
+    if (nameLower.includes('main') || nameLower.includes('middle') || nameLower.includes('content')) {
+      return {
+        type: 'mainContent',
+        gif: FRAME_PLACEHOLDERS.mainContent,
+        text: 'Your story unfolds'
+      };
+    }
+    
+    // Default placeholder
+    return {
+      type: 'default',
+      gif: FRAME_PLACEHOLDERS.default,
+      text: 'Double-click to edit'
+    };
+  };
+
+  const placeholder = getPlaceholderIllustration(frame.name);
+  const [imageError, setImageError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [gifKey, setGifKey] = useState(0);
+
+  // Reset image error when frame changes
+  useEffect(() => {
+    setImageError(false);
+  }, [frame.id, placeholder.gif]);
+
+  // Restart GIF animation on hover
+  useEffect(() => {
+    if (isHovered && frame.layers.length === 0) {
+      // Force GIF to restart animation by reloading it
+      setGifKey(prev => prev + 1);
+    }
+  }, [isHovered, frame.layers.length]);
+
   return (
     <div
       ref={frameRef}
@@ -170,6 +228,8 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
         minWidth: 100,
         minHeight: 100
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -179,8 +239,14 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
         onDoubleClick();
       }}
     >
-      {/* Frame Title - DEBUG: 3x larger font */}
-      <div className="frame__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      {/* Frame Title - Increased size */}
+      <div className="frame__title" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 'var(--space-4)',
+        zIndex: 2,
+        position: 'relative'
+      }}>
         <div 
           style={{ 
             width: 12, 
@@ -190,10 +256,23 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
             flexShrink: 0
           }} 
         />
-        <span style={{ fontWeight: 600, fontSize: '48px' }}>{frame.name}</span>
-        <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, fontSize: '30px' }}>
-          – {frame.size.w}×{frame.size.h}
-        </span>
+        <span style={{ fontWeight: 600, fontSize: '64px', color: '#000000' }}>{frame.name}</span>
+      </div>
+
+      {/* Frame Dimensions - Bottom Right */}
+      <div 
+        style={{
+          position: 'absolute',
+          bottom: 'var(--space-8)',
+          right: 'var(--space-8)',
+          fontSize: '30px',
+          color: '#000000',
+          fontWeight: 400,
+          opacity: 0.7,
+          zIndex: 2
+        }}
+      >
+        {frame.size.w}×{frame.size.h}
       </div>
 
       {/* Frame Info - DEBUG: 3x larger font + coordinates */}
@@ -203,13 +282,14 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
           bottom: 'var(--space-8)',
           left: 'var(--space-8)',
           fontSize: '30px',
-          color: 'var(--text-primary)',
-          background: 'var(--bg-elev-2)',
-          border: '1px solid var(--stroke)',
+          color: '#000000',
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
           padding: '8px 12px',
           borderRadius: 'var(--radius-xs)',
           fontWeight: 500,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          zIndex: 2
         }}
       >
         {frame.duration}s • {frame.fps}fps • {frame.layers.length} layers
@@ -217,22 +297,97 @@ export const FramePreview: React.FC<FramePreviewProps> = ({
 
       {/* DEBUG: Coordinates Display */}
 
-      {/* Frame Content Preview - DEBUG: 3x larger font */}
+      {/* Frame Content Preview - GIF Illustration */}
       <div 
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'var(--text-tertiary)',
-          fontSize: '117px'
+          overflow: 'hidden',
+          padding: '2%',
+          zIndex: 1,
+          backgroundColor: 'transparent',
+          pointerEvents: 'none',
+          // Prevent CSS properties that could stop GIF animation
+          transform: 'none',
+          willChange: 'auto'
         }}
       >
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 108, marginBottom: 27 }}>🎬</div>
-          <div style={{ fontSize: '54px', fontWeight: 500, color: '#999999' }}>Double-click to edit</div>
-        </div>
+        {/* Check if frame has layers (content) - in future, show screenshot instead */}
+        {frame.layers.length === 0 ? (
+          // Show GIF placeholder when frame is empty
+          imageError ? (
+            // Fallback to text if GIF fails to load
+            <div style={{ textAlign: 'center', color: '#000000' }}>
+              <div style={{ fontSize: '108px', marginBottom: '27px' }}>🎬</div>
+              <div style={{ fontSize: '54px', fontWeight: 500, color: '#000000', opacity: 0.7 }}>
+                {placeholder.text}
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <img
+                key={`gif-${frame.id}-${placeholder.type}-${gifKey}`}
+                src={`${placeholder.gif}${gifKey > 0 ? `?restart=${gifKey}` : ''}`}
+                alt={`${placeholder.text} placeholder`}
+                style={{
+                  width: '96%',
+                  height: 'auto',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  opacity: imageError ? 0 : 1
+                }}
+                loading="lazy"
+                onError={(e) => {
+                  console.error('GIF failed to load:', placeholder.gif, e);
+                  setImageError(true);
+                }}
+                onLoad={() => {
+                  // GIF will restart animation when key changes
+                }}
+              />
+              {/* Double click to edit text below GIF */}
+              <div 
+                style={{
+                  marginTop: 'var(--space-8)',
+                  fontSize: '32px',
+                  fontWeight: 500,
+                  color: '#000000',
+                  opacity: 0.6,
+                  textAlign: 'center'
+                }}
+              >
+                Double click to edit
+              </div>
+            </div>
+          )
+        ) : (
+          // Future: Render screenshot here when available
+          // For now, show placeholder text if layers exist but no screenshot
+          <div style={{ textAlign: 'center', color: '#000000' }}>
+            <div style={{ fontSize: '54px', fontWeight: 500, color: '#000000', opacity: 0.7 }}>
+              {placeholder.text}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Resize Handles */}

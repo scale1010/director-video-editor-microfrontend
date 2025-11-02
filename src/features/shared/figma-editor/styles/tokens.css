@@ -22,8 +22,8 @@
   --stroke-strong: rgba(255,255,255,0.14);
   --stroke-focus: rgba(24,160,251,0.9);
 
-  --frame-fill: #1a1a1a;
-  --frame-stroke: rgba(255,255,255,0.12);
+  --frame-fill: #d0d0d0;
+  --frame-stroke: rgba(0,0,0,0.15);
   --frame-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1);
 
   --radius-xs: 4px;

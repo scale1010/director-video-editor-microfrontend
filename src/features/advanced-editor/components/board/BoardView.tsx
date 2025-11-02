@@ -545,7 +545,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           />
 
           {/* Frame Previews */}
-          {project.frames.map(frame => (
+          {console.log('📋 BoardView: Rendering', project.frames.length, 'frames') || project.frames.map(frame => (
             <FramePreview
               key={frame.id}
               frame={frame}

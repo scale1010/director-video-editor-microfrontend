@@ -118,7 +118,7 @@ export const FrameArrows: React.FC<FrameArrowsProps> = ({ frames, sequenceOrder,
         >
           <path
             d="M0,0 L0,6 L9,3 z"
-            fill="rgba(139, 92, 246, 0.8)"
+            fill="#18a0fb"
           />
         </marker>
       </defs>
@@ -130,19 +130,19 @@ export const FrameArrows: React.FC<FrameArrowsProps> = ({ frames, sequenceOrder,
             {/* Arrow line */}
             <path
               d={arrow.path}
-              stroke="rgba(139, 92, 246, 0.6)"
+              stroke="#18a0fb"
               strokeWidth="3"
               fill="none"
               markerEnd="url(#arrowhead)"
               style={{
-                filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))'
+                filter: 'drop-shadow(0 2px 4px rgba(24, 160, 251, 0.4))'
               }}
             />
             
             {/* Glow effect */}
             <path
               d={arrow.path}
-              stroke="rgba(139, 92, 246, 0.3)"
+              stroke="rgba(24, 160, 251, 0.4)"
               strokeWidth="8"
               fill="none"
               style={{
